@@ -8,22 +8,32 @@ import {
   addDoc,
   doc,
   deleteDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { FaTrashAlt } from "react-icons/fa";
-
+import { toast } from "react-hot-toast";
 import { db } from "./firebase/config";
+import { MdModeEdit } from "react-icons/md";
+import { MdOutlineCancel } from "react-icons/md";
 
 function App() {
   const q = query(collection(db, "userlist"), orderBy("createdAt", "desc"));
   const [data, setData] = useState([]);
   const [todo, setTodo] = useState("");
   const [doneList, setDoneList] = useState([]);
+  const [editId, setEditId] = useState(null);
+
+  const handleEdit = (id, name) => {
+    console.log(id);
+    setEditId(id);
+    setTodo(name);
+  };
 
   const toggleDone = (id) => {
     setDoneList((prev) =>
       prev.includes(id)
         ? prev.filter((todo) => {
-            todo !== id;
+            return todo !== id;
           })
         : [...prev, id]
     );
@@ -34,8 +44,24 @@ function App() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    if (editId) {
+      const washingtonRef = doc(db, "userlist", editId);
+      updateDoc(washingtonRef, {
+        name: todo,
+      })
+        .then((res) => {
+          toast.success("Updated successfully");
+          setEditId(null)
+        })
+        .catch((err) => {
+          toast.errror(err.meassage);
+        });
+
+      return;
+    }
+
     if (!todo.length) {
-      alert("Cannot create empty todo.");
+      toast.error("Cannot create empty todo.");
     }
 
     addDoc(collection(db, "userlist"), {
@@ -43,7 +69,7 @@ function App() {
       createdAt: new Date(),
     })
       .then(() => {
-        alert(`New todo added!`);
+        toast.success(`New todo added!`);
         setTodo("");
       })
       .catch((err) => console.log(err.message));
@@ -54,10 +80,20 @@ function App() {
   const handleDelete = (id) => {
     deleteDoc(doc(db, "userlist", id))
       .then(() => {
-        alert("Deleted successffuly ");
+        toast.success("Deleted successffuly.", {
+          style: {
+            border: "1px solid #713200",
+            padding: "16px",
+            color: "#713200",
+          },
+          iconTheme: {
+            primary: "#713200",
+            secondary: "#FFFAEE",
+          },
+        });
       })
       .catch((err) => {
-        alert("Error");
+        toast.error("Error");
       });
   };
 
@@ -69,7 +105,13 @@ function App() {
       setData(users);
     });
   }, []);
-  console.log(data);
+
+  useEffect(() => {
+    if (!editId) {
+      setTodo("");
+    }
+  }, [editId]);
+
   return (
     <div className="bg-slate-200 p-30 m-0 flex flex-col items-center justify-center min-h-screen cursor-pointer">
       <ul className="bg-white rounded-xl p-10 text-[25px] w-full flex flex-col gap-2 ">
@@ -80,21 +122,22 @@ function App() {
         </li>
         {data &&
           data.map(({ id, name, number, age }) => {
+            const isEditingId = editId === id;
             return (
               <li
                 key={id}
                 className={`shadow rounded p-2 flex justify-between ${
-                  doneList.includes(id) ? "line-through bg-gray-100" : ""
+                  doneList.includes(id) ? " bg-gray-100" : ""
                 }`}
               >
-                <div>
+                <div className={`${ doneList.includes(id) ? "line-through"  : " " }`}>
                   {name} <span>{age}</span>
                 </div>
                 <div className="flex gap-[11px] ">
                   <button
                     className={`rounded-lg border-none px-2 py-[3px] ${
                       doneList.includes(id)
-                        ? "bg-gray-200"
+                        ? "bg-gray-200 "
                         : "bg-lime-200 hover:bg-lime-300"
                     } cursor-pointer `}
                     onClick={() => toggleDone(id)}
@@ -105,10 +148,29 @@ function App() {
                     onClick={() => {
                       handleDelete(id);
                     }}
-                    className="hover:shadow-[0_0_10px_#fca5a5] cursor-pointer"
+                    className=" cursor-pointer"
                   >
-                    <FaTrashAlt />
+                    <FaTrashAlt className="hover:shadow-[0_0_10px_#fca5a5] bg-[0_0_10px_#fca5a5]" />
                   </button>
+                  {isEditingId ? (
+                    <button
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setEditId(false);
+                      }}
+                    >
+                      <MdOutlineCancel />
+                    </button>
+                  ) : (
+                    <button
+                      className="cursor-pointer  "
+                      onClick={() => {
+                        handleEdit(id, name);
+                      }}
+                    >
+                      <MdModeEdit className="hover" />
+                    </button>
+                  )}
                 </div>
               </li>
             );
@@ -128,15 +190,26 @@ function App() {
             type="text"
             placeholder="To do"
             className="bg-white outline-none rounded-lg px-2 py-1 w-[400px] h-[35px] text-[18px] "
+            value={todo}
           />
         </label>
-        <button
-          className="bg-slate-50 text-[18px] w-[200px] rounded-lg cursor-pointer hover:scale-90 h-[33px] "
-          name="todo"
-          id="todo"
-        >
-          Create
-        </button>
+        {editId ? (
+          <button
+            className="bg-slate-50 text-[18px] w-[200px] rounded-lg cursor-pointer hover:scale-90 h-[33px] "
+            name="todo"
+            id="todo"
+          >
+            Save
+          </button>
+        ) : (
+          <button
+            className="bg-slate-50 text-[18px] w-[200px] rounded-lg cursor-pointer hover:scale-90 h-[33px] "
+            name="todo"
+            id="todo"
+          >
+            Create
+          </button>
+        )}
       </form>
     </div>
   );
